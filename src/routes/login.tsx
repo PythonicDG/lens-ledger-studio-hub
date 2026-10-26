@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import portrait from "@/assets/portrait.jpg";
-import { AuthShell, Field, SubmitButton } from "@/components/auth-shell";
+import { AuthShell, Field, SubmitButton, type Errs } from "@/components/auth-shell";
 import { getStudio } from "@/lib/flow";
 
 export const Route = createFileRoute("/login")({
@@ -14,12 +14,12 @@ function Login() {
   const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
-  const [e, setE] = useState<Record<string, string>>({});
+  const [e, setE] = useState<Errs>({});
   const [loading, setLoading] = useState(false);
 
   const submit = (ev: React.FormEvent) => {
     ev.preventDefault();
-    const err: Record<string, string> = {};
+    const err: Errs = {};
     if (!/^\S+@\S+\.\S+$/.test(email)) err.email = "Enter a valid email";
     if (!pw) err.password = "Enter your password";
     setE(err);

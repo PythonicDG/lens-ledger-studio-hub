@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import bts from "@/assets/bts.jpg";
-import { AuthShell, Field, SubmitButton } from "@/components/auth-shell";
+import { AuthShell, Field, SubmitButton, type Errs } from "@/components/auth-shell";
 import { getStudio, saveStudio } from "@/lib/flow";
 
 export const Route = createFileRoute("/setup")({
@@ -20,7 +20,7 @@ function Setup() {
   const [gstin, setGstin] = useState("");
   const [specs, setSpecs] = useState<string[]>(["Wedding"]);
   const [team, setTeam] = useState("2–5");
-  const [e, setE] = useState<Record<string, string>>({});
+  const [e, setE] = useState<Errs>({});
 
   useEffect(() => {
     const s = getStudio();
@@ -31,7 +31,7 @@ function Setup() {
   const toggle = (s: string) => setSpecs(specs.includes(s) ? specs.filter((x) => x !== s) : [...specs, s]);
   const submit = (ev: React.FormEvent) => {
     ev.preventDefault();
-    const err: Record<string, string> = {};
+    const err: Errs = {};
     if (name.trim().length < 2) err.name = "Enter your studio name";
     if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin.toUpperCase())) err.gstin = "GSTIN looks invalid (e.g. 27AAPFL1234C1Z5)";
     if (!specs.length) err.specs = "Pick at least one";

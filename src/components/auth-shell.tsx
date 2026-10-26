@@ -33,7 +33,7 @@ export function AuthShell({ image, quote, credit, step, children }: { image: str
   );
 }
 
-export function Field({ label, error, ...props }: { label: string; error?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+export function Field({ label, error, ...props }: { label: string; error?: string | undefined } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="block">
       <span className="text-sm font-medium">{label}</span>
@@ -53,3 +53,4 @@ export function SubmitButton({ children, loading }: { children: ReactNode; loadi
     </button>
   );
 }
+export type Errs = Partial<Record<"name" | "email" | "phone" | "password" | "gstin" | "specs", string>>;
