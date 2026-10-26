@@ -10,7 +10,7 @@ export const Route = createFileRoute("/welcome")({
   component: Welcome,
 });
 
-const TASKS = [
+const TASKS: [string, string, string, string][] = [
   ["profile", "Add your studio logo & brand colours", "Shows on quotations, invoices and galleries.", "2 min"],
   ["package", "Create your first package", "e.g. “Royal Wedding — 3 days, 2 photographers, 1 cinematographer — ₹3,50,000”", "4 min"],
   ["import", "Import existing clients", "Upload your Excel or Google Sheet of past clients.", "3 min"],
