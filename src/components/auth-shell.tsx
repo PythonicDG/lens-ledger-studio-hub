@@ -15,19 +15,19 @@ export function AuthShell({ image, quote, credit, step, children }: { image: str
           </blockquote>
         </div>
       </div>
-      <div className="flex flex-col px-6 py-8 sm:px-12">
-        <div className="flex items-center justify-between lg:justify-end">
+      <div className="flex min-w-0 flex-col px-4 py-6 sm:px-10 sm:py-8 lg:px-12">
+        <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
           <div className="lg:hidden"><Logo /></div>
           {step && (
-            <div className="flex items-center gap-2">
-              {[1, 2, 3, 4].map((s) => (
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {[1, 2, 3].map((s) => (
                 <span key={s} className={`h-1 w-8 rounded-full ${s <= step ? "bg-olive" : "bg-border"}`} />
               ))}
-              <span className="ml-2 text-xs text-muted-foreground">Step {step} of 4</span>
+              <span className="ml-2 text-xs text-muted-foreground">Step {step} of 3</span>
             </div>
           )}
         </div>
-        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10 animate-rise">{children}</div>
+        <div className="mx-auto flex w-full min-w-0 max-w-md flex-1 flex-col justify-center py-8 sm:py-10 animate-rise">{children}</div>
       </div>
     </div>
   );
@@ -53,4 +53,4 @@ export function SubmitButton({ children, loading }: { children: ReactNode; loadi
     </button>
   );
 }
-export type Errs = Partial<Record<"name" | "email" | "phone" | "password" | "gstin" | "specs", string>>;
+export type Errs = Partial<Record<"name" | "email" | "phone" | "password" | "studioName" | "gstin" | "specs", string>>;

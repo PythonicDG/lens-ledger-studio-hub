@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import portrait from "@/assets/portrait.jpg";
 import { AuthShell, Field, SubmitButton, type Errs } from "@/components/auth-shell";
-import { getStudio } from "@/lib/flow";
+import { ApiError, fetchStudio, loginAccount } from "@/lib/auth";
+import { replaceStudio } from "@/lib/flow";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Log in — FrameFlow" }, { name: "description", content: "Log in to your FrameFlow studio." }, { property: "og:title", content: "Log in to FrameFlow" }, { property: "og:description", content: "Access your studio dashboard." }] }),
@@ -17,7 +18,13 @@ function Login() {
   const [e, setE] = useState<Errs>({});
   const [loading, setLoading] = useState(false);
 
-  const submit = (ev: React.FormEvent) => {
+  useEffect(() => {
+    const verification = new URLSearchParams(window.location.search).get("verification");
+    if (verification === "success") toast.success("Email verified. Log in to set up your studio.");
+    if (verification === "invalid") toast.error("Verification link is invalid or expired.");
+  }, []);
+
+  const submit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     const err: Errs = {};
     if (!/^\S+@\S+\.\S+$/.test(email)) err.email = "Enter a valid email";
@@ -25,11 +32,32 @@ function Login() {
     setE(err);
     if (Object.keys(err).length) return;
     setLoading(true);
-    setTimeout(() => {
-      const s = getStudio();
-      toast.success(`Welcome back${s.ownerName ? ", " + s.ownerName.split(" ")[0] : ""}`);
-      nav({ to: s.studioName ? "/welcome" : "/setup" });
-    }, 500);
+    try {
+      const user = await loginAccount(email.trim(), pw);
+      let studio;
+      try { studio = await fetchStudio(); }
+      catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 404) throw error;
+        replaceStudio({ ownerName: user.full_name, email: user.email, phone: user.phone });
+        toast.success(`Welcome, ${user.full_name.split(" ")[0]}`);
+        nav({ to: "/setup" });
+        return;
+      }
+      replaceStudio({ ownerName: user.full_name, email: user.email, phone: user.phone, studioName: studio.name, logo: studio.logo, city: studio.city, state: studio.state, businessType: studio.business_type, gstin: studio.gstin, ...(studio.trial_started_at ? { trialStartedAt: studio.trial_started_at } : {}) });
+      toast.success(`Welcome back, ${user.full_name.split(" ")[0]}`);
+      setPw("");
+      nav({ to: studio.trial_started_at ? "/welcome" : "/setup" });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const fields: Errs = {};
+        if (error.fields["email"]) fields.email = error.fields["email"];
+        if (error.fields["password"]) fields.password = error.fields["password"];
+        setE(fields);
+        toast.error(error.message);
+      } else toast.error("Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

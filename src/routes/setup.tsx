@@ -1,73 +1,92 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import bts from "@/assets/bts.jpg";
 import { AuthShell, Field, SubmitButton, type Errs } from "@/components/auth-shell";
+import { getAuthToken, createStudio, updateStudio, ApiError } from "@/lib/auth";
 import { getStudio, saveStudio } from "@/lib/flow";
 
 export const Route = createFileRoute("/setup")({
-  head: () => ({ meta: [{ title: "Set up your studio — FrameFlow" }, { name: "description", content: "Tell us about your photography studio." }, { property: "og:title", content: "Studio setup — FrameFlow" }, { property: "og:description", content: "Set up your studio in minutes." }] }),
+  head: () => ({ meta: [{ title: "Set up your studio — FrameFlow" }, { name: "description", content: "Add the finishing details for your studio." }] }),
   component: Setup,
 });
 
-const SPECS = ["Wedding", "Pre-wedding", "Maternity & baby", "Portraits", "Corporate", "Fashion", "Product", "Events"];
-const TEAMS = ["Just me", "2–5", "6–15", "16+"];
-const CITIES = ["Mumbai", "Pune", "Delhi NCR", "Bengaluru", "Hyderabad", "Chennai", "Kolkata", "Jaipur", "Ahmedabad", "Kochi"];
+const BUSINESS_TYPES = ["Wedding", "Portrait", "Commercial", "Events", "Other"];
 
 function Setup() {
   const nav = useNavigate();
-  const [name, setName] = useState("");
-  const [city, setCity] = useState("Pune");
+  const [studioName, setStudioName] = useState("");
+  const [existingStudio, setExistingStudio] = useState(false);
+  const [logo, setLogo] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [businessType, setBusinessType] = useState("");
   const [gstin, setGstin] = useState("");
-  const [specs, setSpecs] = useState<string[]>(["Wedding"]);
-  const [team, setTeam] = useState("2–5");
   const [e, setE] = useState<Errs>({});
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const s = getStudio();
-    if (s.studioName) setName(s.studioName);
-    if (s.city) setCity(s.city);
-  }, []);
+    if (!getAuthToken()) { nav({ to: "/login" }); return; }
+    setStudioName(s.studioName || "");
+    setExistingStudio(Boolean(s.studioName));
+    setLogo(s.logo || "");
+    setCity(s.city || "");
+    setState(s.state || "");
+    setBusinessType(s.businessType || "");
+    setGstin(s.gstin || "");
+  }, [nav]);
 
-  const toggle = (s: string) => setSpecs(specs.includes(s) ? specs.filter((x) => x !== s) : [...specs, s]);
-  const submit = (ev: React.FormEvent) => {
-    ev.preventDefault();
-    const err: Errs = {};
-    if (name.trim().length < 2) err.name = "Enter your studio name";
-    if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin.toUpperCase())) err.gstin = "GSTIN looks invalid (e.g. 27AAPFL1234C1Z5)";
-    if (!specs.length) err.specs = "Pick at least one";
-    setE(err);
-    if (Object.keys(err).length) return;
-    saveStudio({ studioName: name, city, gstin: gstin.toUpperCase(), specialities: specs, teamSize: team });
-    nav({ to: "/plan" });
+  const chooseLogo = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 2_000_000) { toast.error("Choose an image under 2 MB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => setLogo(String(reader.result));
+    reader.readAsDataURL(file);
   };
 
-  const chip = (on: boolean) => `rounded-full border px-4 py-2 text-sm transition ${on ? "border-olive bg-olive text-accent-foreground" : "border-border bg-card hover:border-foreground"}`;
+  const continueToTrial = async (skipOptional = false) => {
+    const err: Errs = {};
+    if (studioName.trim().length < 2) err.studioName = "Please enter your studio name";
+    if (!skipOptional && gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin.trim().toUpperCase())) err.gstin = "Enter a valid GSTIN";
+    setE(err);
+    if (Object.keys(err).length) return;
+    setLoading(true);
+    try {
+      const details = skipOptional ? { name: studioName.trim() } : { name: studioName.trim(), logo, city: city.trim(), state: state.trim(), business_type: businessType, gstin: gstin.trim().toUpperCase() };
+      if (existingStudio) await updateStudio(details);
+      else await createStudio(details);
+      saveStudio(skipOptional ? { studioName: studioName.trim() } : { studioName: studioName.trim(), logo, city: city.trim(), state: state.trim(), businessType, gstin: gstin.trim().toUpperCase() });
+      nav({ to: "/trial" });
+    } catch (error) {
+      if (error instanceof ApiError) { setE({ ...(error.fields["name"] ? { studioName: error.fields["name"] } : {}), ...(error.fields["gstin"] ? { gstin: error.fields["gstin"] } : {}) }); toast.error(error.message); }
+      else toast.error("Could not save studio details.");
+    } finally { setLoading(false); }
+  };
 
   return (
     <AuthShell image={bts} quote="We onboarded our team of twelve in an afternoon." credit="Karan Sethi · Golden Hour Films, Jaipur" step={2}>
       <p className="eyebrow text-olive">Studio setup</p>
-      <h1 className="mt-3 text-4xl">Tell us about your studio.</h1>
-      <form onSubmit={submit} className="mt-8 space-y-6" noValidate>
-        <Field label="Studio name" placeholder="Lenscraft Studio" value={name} onChange={(x) => setName(x.target.value)} error={e.name} />
+      <h1 className="mt-3 text-4xl">Make it yours.</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Name your studio. The other details can wait.</p>
+      <form onSubmit={(ev) => { ev.preventDefault(); void continueToTrial(); }} className="mt-8 space-y-6" noValidate>
+        <Field label="Studio name" placeholder="Lenscraft Studio" value={studioName} onChange={(ev) => setStudioName(ev.target.value)} error={e.studioName} />
+        <label className="block">
+          <span className="text-sm font-medium">Studio logo</span>
+          <input type="file" accept="image/*" onChange={(ev) => chooseLogo(ev.target.files?.[0])} className="mt-2 block w-full max-w-full text-sm text-muted-foreground" />
+          {logo && <img src={logo} alt="Studio logo preview" className="mt-3 h-20 w-20 rounded-md border border-border object-contain" />}
+        </label>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-sm font-medium">City</span>
-            <select value={city} onChange={(x) => setCity(x.target.value)} className="mt-1.5 w-full rounded-md border border-input bg-card px-3.5 py-2.5 text-sm outline-none focus:border-olive">
-              {CITIES.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </label>
-          <Field label="GSTIN (optional)" placeholder="27AAPFL1234C1Z5" value={gstin} onChange={(x) => setGstin(x.target.value)} error={e.gstin} />
+          <Field label="City" placeholder="Pune" value={city} onChange={(ev) => setCity(ev.target.value)} />
+          <Field label="State" placeholder="Maharashtra" value={state} onChange={(ev) => setState(ev.target.value)} />
         </div>
         <div>
-          <span className="text-sm font-medium">What do you shoot?</span>
-          <div className="mt-2 flex flex-wrap gap-2">{SPECS.map((s) => <button type="button" key={s} onClick={() => toggle(s)} className={chip(specs.includes(s))}>{s}</button>)}</div>
-          {e.specs && <span className="mt-1 block text-xs text-destructive">{e.specs}</span>}
+          <span className="text-sm font-medium">Business type</span>
+          <div className="mt-2 flex flex-wrap gap-2">{BUSINESS_TYPES.map((type) => <button type="button" key={type} onClick={() => setBusinessType(type)} className={`rounded-full border px-4 py-2 text-sm transition ${businessType === type ? "border-olive bg-olive text-accent-foreground" : "border-border bg-card hover:border-foreground"}`}>{type}</button>)}</div>
         </div>
-        <div>
-          <span className="text-sm font-medium">Team size</span>
-          <div className="mt-2 flex flex-wrap gap-2">{TEAMS.map((t) => <button type="button" key={t} onClick={() => setTeam(t)} className={chip(team === t)}>{t}</button>)}</div>
-        </div>
-        <SubmitButton>Continue</SubmitButton>
+        <Field label="GSTIN (optional)" placeholder="27AAPFL1234C1Z5" value={gstin} onChange={(ev) => setGstin(ev.target.value)} error={e.gstin} />
+        <SubmitButton loading={loading}>Continue to free trial</SubmitButton>
+        <button type="button" disabled={loading} onClick={() => { void continueToTrial(true); }} className="w-full text-sm text-muted-foreground underline-offset-4 hover:underline">Skip optional details</button>
       </form>
     </AuthShell>
   );

@@ -1,9 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import hero from "@/assets/hero-wedding.jpg";
 import { Logo } from "@/components/site";
-import { getStudio, PLANS, type Studio } from "@/lib/flow";
+import { getStudio, type Studio } from "@/lib/flow";
+import { getAuthToken } from "@/lib/auth";
 
 export const Route = createFileRoute("/welcome")({
   head: () => ({ meta: [{ title: "Welcome to FrameFlow" }, { name: "description", content: "Your studio's getting-started checklist." }, { property: "og:title", content: "Welcome to FrameFlow" }, { property: "og:description", content: "Get your studio running in a few steps." }] }),
@@ -20,31 +21,36 @@ const TASKS: [string, string, string, string][] = [
 ];
 
 function Welcome() {
+  const nav = useNavigate();
   const [s, setS] = useState<Studio>({});
   const [done, setDone] = useState<string[]>([]);
   useEffect(() => {
-    setS(getStudio());
+    const studio = getStudio();
+    if (!getAuthToken()) { nav({ to: "/login" }); return; }
+    if (!studio.studioName) { nav({ to: "/setup" }); return; }
+    if (!studio.trialStartedAt) { nav({ to: "/trial" }); return; }
+    setS(studio);
     try { setDone(JSON.parse(localStorage.getItem("frameflow.checklist") || "[]")); } catch { /* ignore */ }
-  }, []);
+  }, [nav]);
   const toggle = (id: string) => {
     const next = done.includes(id) ? done.filter((d) => d !== id) : [...done, id];
     setDone(next);
     localStorage.setItem("frameflow.checklist", JSON.stringify(next));
   };
   const pct = Math.round((done.length / TASKS.length) * 100);
-  const plan = PLANS.find((p) => p.id === s.plan);
   const first = s.ownerName?.split(" ")[0] || "there";
+  const daysLeft = s.trialStartedAt ? Math.max(0, Math.ceil((new Date(s.trialStartedAt).getTime() + 14 * 86400000 - Date.now()) / 86400000)) : 14;
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-6 sm:px-6">
         <Logo />
-        <span className="rounded-full bg-olive-soft px-3 py-1 text-xs text-olive">{plan?.name ?? "Studio"} trial · 14 days left</span>
+        <span className="rounded-full bg-olive-soft px-3 py-1 text-xs text-olive">Free trial · {daysLeft} days left</span>
       </div>
-      <div className="mx-auto grid max-w-7xl gap-12 px-6 pb-20 pt-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="mx-auto grid max-w-7xl gap-12 px-4 pb-20 pt-6 sm:px-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="animate-rise">
-          <p className="eyebrow text-olive">Step 4 of 4 · You're in</p>
-          <h1 className="mt-3 text-5xl leading-tight sm:text-6xl">Namaste, {first}.<br /><em className="text-ember">Let's get {s.studioName || "your studio"} rolling.</em></h1>
+          <p className="eyebrow text-olive">Your trial has started</p>
+          <h1 className="mt-3 break-words text-4xl leading-tight sm:text-6xl">Namaste, {first}.<br /><em className="text-ember">Let's get {s.studioName || "your studio"} rolling.</em></h1>
           <div className="mt-10 flex items-center gap-4">
             <div className="h-2 flex-1 rounded-full bg-muted"><div className="h-2 rounded-full bg-olive transition-all" style={{ width: `${pct}%` }} /></div>
             <span className="text-sm font-medium">{done.length}/{TASKS.length} done</span>
@@ -74,7 +80,7 @@ function Welcome() {
           <div className="absolute -bottom-6 left-6 right-6 rounded-md bg-card p-5 shadow-print">
             <p className="eyebrow text-muted-foreground">Your studio</p>
             <p className="mt-1 font-display text-2xl">{s.studioName || "Lenscraft Studio"}</p>
-            <p className="text-sm text-muted-foreground">{s.city || "Pune"} · {(s.specialities || ["Wedding"]).join(", ")} · Team {s.teamSize || "2–5"}</p>
+            {(s.city || s.state || s.businessType) && <p className="text-sm text-muted-foreground">{[s.city, s.state, s.businessType].filter(Boolean).join(" · ")}</p>}
             {s.gstin && <p className="mt-1 text-xs text-muted-foreground">GSTIN {s.gstin}</p>}
           </div>
         </aside>

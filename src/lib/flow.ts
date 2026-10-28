@@ -4,6 +4,10 @@ export type Studio = {
   phone?: string;
   studioName?: string;
   city?: string;
+  state?: string;
+  businessType?: string;
+  logo?: string;
+  trialStartedAt?: string;
   specialities?: string[];
   teamSize?: string;
   gstin?: string;
@@ -26,6 +30,11 @@ export function saveStudio(patch: Studio) {
   const next = { ...getStudio(), ...patch };
   localStorage.setItem(KEY, JSON.stringify(next));
   return next;
+}
+
+export function replaceStudio(studio: Studio) {
+  localStorage.setItem(KEY, JSON.stringify(studio));
+  return studio;
 }
 
 export const PLANS = [

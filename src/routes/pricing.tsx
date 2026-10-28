@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { SiteNav, SiteFooter } from "@/components/site";
 import { PlanGrid, BillingToggle } from "@/components/plan-grid";
-import { saveStudio } from "@/lib/flow";
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({
@@ -17,7 +16,7 @@ export const Route = createFileRoute("/pricing")({
 });
 
 const faqs = [
-  ["Is there a free trial?", "Yes — 14 days on any plan, no card needed."],
+  ["Is there a free trial?", "Yes — start with 14 days free and no card. Choose a plan when the trial ends."],
   ["Do invoices include GST?", "Yes. Add your GSTIN and every quotation and invoice is GST-compliant, with CGST/SGST/IGST split automatically."],
   ["Can I import my existing clients?", "Upload an Excel or Google Sheet and we'll map it for you. Our team helps on Studio and Collective plans."],
   ["Can I pay via UPI?", "Yes — UPI, cards, net banking and annual invoices for businesses."],
@@ -38,7 +37,7 @@ function Pricing() {
           </div>
         </div>
         <div className="mt-20">
-          <PlanGrid billing={billing} cta="Start free trial" onSelect={(id) => { saveStudio({ plan: id, billing }); nav({ to: "/register" }); }} />
+          <PlanGrid billing={billing} cta="Start free trial" onSelect={() => nav({ to: "/register" })} />
         </div>
       </section>
       <section className="border-t border-border bg-secondary py-24">
