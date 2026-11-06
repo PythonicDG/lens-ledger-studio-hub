@@ -1,18 +1,23 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Eye, ImagePlus, RotateCcw, X } from "lucide-react";
+import { Crop, Eye, ImagePlus, Move, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { getStudio } from "@/lib/flow";
 import type { Client, Platform, Quote } from "@/lib/platform";
 import {
+  DEFAULT_CROP,
   DEFAULT_PHOTOS,
+  MAX_ZOOM,
   SLOT_BOXES,
   SLOT_LABELS,
   buildQuotationFor,
-  fitImage,
+  isDefaultCrop,
+  normalizeCrop,
+  prepareSlotPhoto,
   readFileAsDataUrl,
   resolvePdfFormat,
   shrinkImage,
   type PdfFormat,
+  type PhotoCrop,
   type PhotoSlotId,
 } from "@/lib/quotation-pdf";
 
@@ -39,26 +44,296 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-/** Upload / replace / reset / preview controls around one image. */
+/**
+ * Shows `src` framed exactly as the PDF will crop it: a cover fit inside a box of aspect `aspect`, zoomed and
+ * shifted by `crop`. Everything is in percentages, so it works at any rendered size.
+ */
+function CroppedImage({
+  src,
+  alt,
+  aspect,
+  crop,
+  imgAspect,
+  onImgAspect,
+}: {
+  src: string;
+  alt: string;
+  aspect: number;
+  crop: PhotoCrop;
+  imgAspect: number | null;
+  onImgAspect: (aspect: number) => void;
+}) {
+  const { w, h } = displayScale(aspect, imgAspect, crop.zoom);
+  return (
+    <img
+      src={src}
+      alt={alt}
+      draggable={false}
+      onLoad={(e) => {
+        const el = e.currentTarget;
+        if (el.naturalWidth && el.naturalHeight) onImgAspect(el.naturalWidth / el.naturalHeight);
+      }}
+      className="pointer-events-none absolute max-w-none select-none"
+      style={{
+        width: `${w * 100}%`,
+        height: `${h * 100}%`,
+        left: `${-(w - 1) * crop.x * 100}%`,
+        top: `${-(h - 1) * crop.y * 100}%`,
+      }}
+    />
+  );
+}
+
+/**
+ * Size of the displayed photo relative to its frame (1 = exactly the frame on that axis). Until the image reports
+ * its size, it is assumed to match the frame (a plain centred fill).
+ */
+function displayScale(frameAspect: number, imgAspect: number | null, zoom: number) {
+  const ia = imgAspect ?? frameAspect;
+  const wide = ia > frameAspect;
+  return { w: zoom * (wide ? ia / frameAspect : 1), h: zoom * (wide ? 1 : frameAspect / ia) };
+}
+
+const PRESETS: { label: string; crop: Partial<PhotoCrop> }[] = [
+  { label: "Top", crop: { y: 0 } },
+  { label: "Center", crop: { x: 0.5, y: 0.5 } },
+  { label: "Bottom", crop: { y: 1 } },
+  { label: "Left", crop: { x: 0 } },
+  { label: "Right", crop: { x: 1 } },
+];
+
+/** Modal for re-framing one photo inside its slot: drag to move, slider / wheel / buttons to zoom. */
+function CropEditor({
+  label,
+  src,
+  aspect,
+  initial,
+  onSave,
+  onClose,
+}: {
+  label: string;
+  src: string;
+  aspect: number;
+  initial: PhotoCrop;
+  onSave: (crop: PhotoCrop) => void;
+  onClose: () => void;
+}) {
+  const [crop, setCrop] = useState<PhotoCrop>(initial);
+  const [imgAspect, setImgAspect] = useState<number | null>(null);
+  const frame = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ px: number; py: number; start: PhotoCrop; slackX: number; slackY: number } | null>(null);
+  const patch = (next: Partial<PhotoCrop>) => setCrop((cur) => normalizeCrop({ ...cur, ...next }));
+
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Wheel zoom needs a non-passive listener so the page does not scroll at the same time.
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setCrop((cur) => normalizeCrop({ ...cur, zoom: cur.zoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08) }));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const scale = displayScale(aspect, imgAspect, crop.zoom);
+  const canMove = scale.w > 1.001 || scale.h > 1.001;
+
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    const rect = frame.current?.getBoundingClientRect();
+    if (!rect) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    drag.current = {
+      px: e.clientX,
+      py: e.clientY,
+      start: crop,
+      slackX: rect.width * (scale.w - 1),
+      slackY: rect.height * (scale.h - 1),
+    };
+  };
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    // Dragging the photo right reveals more of its left side, so x goes down.
+    patch({
+      x: d.slackX > 0.5 ? d.start.x - (e.clientX - d.px) / d.slackX : d.start.x,
+      y: d.slackY > 0.5 ? d.start.y - (e.clientY - d.py) / d.slackY : d.start.y,
+    });
+  };
+  const endDrag = () => {
+    drag.current = null;
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 0.1 : 0.02;
+    const moves: Record<string, Partial<PhotoCrop>> = {
+      ArrowLeft: { x: crop.x - step },
+      ArrowRight: { x: crop.x + step },
+      ArrowUp: { y: crop.y - step },
+      ArrowDown: { y: crop.y + step },
+      "+": { zoom: crop.zoom + 0.1 },
+      "=": { zoom: crop.zoom + 0.1 },
+      "-": { zoom: crop.zoom - 0.1 },
+    };
+    const m = moves[e.key];
+    if (!m) return;
+    e.preventDefault();
+    patch(m);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Adjust ${label}`}
+      onClick={onClose}
+    >
+      <div
+        className="max-h-full w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg">Adjust photo · {label}</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Drag the photo to choose which part shows, and zoom with the slider or mouse wheel. The frame is the exact
+              shape of this slot in the PDF.
+            </p>
+          </div>
+          <button type="button" className="rounded-full p-1.5 hover:bg-muted" aria-label="Close" onClick={onClose}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="mt-4 flex justify-center rounded-xl bg-muted p-3">
+          <div
+            ref={frame}
+            role="application"
+            aria-label="Photo position. Use the arrow keys to move, plus and minus to zoom."
+            tabIndex={0}
+            className={`relative overflow-hidden rounded-md bg-neutral-200 outline-none ring-olive/40 focus-visible:ring-4 ${
+              canMove ? "cursor-grab active:cursor-grabbing" : ""
+            }`}
+            // Wide slots fill the width; tall ones are capped so the frame stays on screen.
+            style={{ width: `min(100%, calc(55vh * ${aspect}))`, aspectRatio: String(aspect), touchAction: "none" }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onKeyDown={onKeyDown}
+          >
+            <CroppedImage src={src} alt={label} aspect={aspect} crop={crop} imgAspect={imgAspect} onImgAspect={setImgAspect} />
+            {/* Rule-of-thirds guide */}
+            <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3">
+              {Array.from({ length: 9 }, (_, i) => (
+                <div key={i} className="border border-white/25" />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className={secondary}
+              aria-label="Zoom out"
+              disabled={crop.zoom <= 1}
+              onClick={() => patch({ zoom: crop.zoom - 0.1 })}
+            >
+              <ZoomOut size={14} />
+            </button>
+            <input
+              type="range"
+              min={1}
+              max={MAX_ZOOM}
+              step={0.01}
+              value={crop.zoom}
+              aria-label="Zoom"
+              className="h-1.5 w-full cursor-pointer accent-olive"
+              onChange={(e) => patch({ zoom: Number(e.target.value) })}
+            />
+            <button
+              type="button"
+              className={secondary}
+              aria-label="Zoom in"
+              disabled={crop.zoom >= MAX_ZOOM}
+              onClick={() => patch({ zoom: crop.zoom + 0.1 })}
+            >
+              <ZoomIn size={14} />
+            </button>
+            <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">{crop.zoom.toFixed(2)}×</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 inline-flex items-center gap-1 text-xs font-semibold text-foreground/75">
+              <Move size={13} /> Quick position
+            </span>
+            {PRESETS.map((preset) => (
+              <button key={preset.label} type="button" className={secondary} onClick={() => patch(preset.crop)}>
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          {imgAspect !== null && !canMove && (
+            <p className="text-[11px] text-muted-foreground">
+              This photo already has the same shape as the slot. Zoom in to move it around.
+            </p>
+          )}
+        </div>
+
+        <div className="mt-5 flex flex-wrap justify-between gap-2">
+          <button type="button" className={secondary} onClick={() => setCrop(DEFAULT_CROP)}>
+            <RotateCcw size={13} /> Reset framing
+          </button>
+          <div className="flex gap-2">
+            <button type="button" className={secondary} onClick={onClose}>
+              Cancel
+            </button>
+            <button type="button" className={btn} onClick={() => onSave(crop)}>
+              Apply
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Upload / replace / reset / preview (and, for photo slots, adjust) controls around one image. */
 function ImagePicker({
   label,
   src,
   custom,
   aspect,
   fallback,
+  crop,
   onFile,
   onReset,
   onPreview,
+  onAdjust,
 }: {
   label: string;
   src: string;
   custom: boolean;
   aspect: number;
   fallback?: string;
+  /** Present for photo slots: the thumbnail shows this framing and an Adjust button appears. */
+  crop?: PhotoCrop;
   onFile: (file: File) => Promise<void>;
   onReset: () => void;
   onPreview: (src: string, label: string) => void;
+  onAdjust?: (src: string) => void;
 }) {
+  const [imgAspect, setImgAspect] = useState<number | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const pick = async (file: File | undefined) => {
@@ -76,17 +351,25 @@ function ImagePicker({
     }
   };
   const shown = src || fallback || "";
+  const framed = !!crop && !isDefaultCrop(crop);
+  // Photo slots show their true shape so the thumbnail matches the PDF; logo / QR boxes stay within a tidy range.
+  const boxAspect = crop ? aspect : Math.min(Math.max(aspect, 0.6), 3);
   return (
     <div className="rounded-xl border border-border bg-white p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold">{label}</span>
-        <span className="text-[10px] text-muted-foreground">{custom ? "Custom" : "Default"}</span>
+        <span className="text-[10px] text-muted-foreground">
+          {custom ? "Custom" : "Default"}
+          {framed ? " · Adjusted" : ""}
+        </span>
       </div>
       <div
-        className="mt-2 flex w-full items-center justify-center overflow-hidden rounded-lg bg-muted"
-        style={{ aspectRatio: String(Math.min(Math.max(aspect, 0.6), 3)) }}
+        className="relative mx-auto mt-2 flex w-full items-center justify-center overflow-hidden rounded-lg bg-muted"
+        style={{ aspectRatio: String(boxAspect) }}
       >
-        {shown ? (
+        {shown && crop ? (
+          <CroppedImage src={shown} alt={label} aspect={aspect} crop={crop} imgAspect={imgAspect} onImgAspect={setImgAspect} />
+        ) : shown ? (
           <img src={shown} alt={label} className="h-full w-full object-cover" />
         ) : (
           <span className="text-[11px] text-muted-foreground">No image</span>
@@ -96,6 +379,17 @@ function ImagePicker({
         <button type="button" className={secondary} disabled={busy} onClick={() => input.current?.click()}>
           <ImagePlus size={13} /> {busy ? "Processing..." : custom ? "Replace" : "Upload"}
         </button>
+        {onAdjust && (
+          <button
+            type="button"
+            className={secondary}
+            disabled={!shown || busy}
+            aria-label={`Adjust ${label}`}
+            onClick={() => onAdjust(shown)}
+          >
+            <Crop size={13} /> Adjust
+          </button>
+        )}
         <button type="button" className={secondary} disabled={!shown} onClick={() => onPreview(shown, label)}>
           <Eye size={13} /> Preview
         </button>
@@ -150,6 +444,7 @@ export function QuotationPdfSettings({ data, update }: { data: Platform; update:
   const studio = getStudio();
   const [f, setF] = useState<PdfFormat>(() => resolvePdfFormat(data.settings.pdfFormat, studio));
   const [lightbox, setLightbox] = useState<{ src: string; label: string } | null>(null);
+  const [adjusting, setAdjusting] = useState<{ id: PhotoSlotId; src: string; label: string } | null>(null);
   const [building, setBuilding] = useState(false);
   const set = <K extends keyof PdfFormat>(key: K, value: PdfFormat[K]) => setF((cur) => ({ ...cur, [key]: value }));
   const setPhoto = (id: PhotoSlotId, value: string | undefined) =>
@@ -157,7 +452,17 @@ export function QuotationPdfSettings({ data, update }: { data: Platform; update:
       const photos = { ...cur.photos };
       if (value) photos[id] = value;
       else delete photos[id];
-      return { ...cur, photos };
+      // A new or removed photo starts from the centred framing again.
+      const photoCrops = { ...cur.photoCrops };
+      delete photoCrops[id];
+      return { ...cur, photos, photoCrops };
+    });
+  const setCrop = (id: PhotoSlotId, crop: PhotoCrop) =>
+    setF((cur) => {
+      const photoCrops = { ...cur.photoCrops };
+      if (isDefaultCrop(crop)) delete photoCrops[id];
+      else photoCrops[id] = normalizeCrop(crop);
+      return { ...cur, photoCrops };
     });
 
   const save = () => {
@@ -205,9 +510,11 @@ export function QuotationPdfSettings({ data, update }: { data: Platform; update:
         fallback={defaultPhotoFor(id)}
         custom={!!f.photos[id]}
         aspect={box.w / box.h}
-        onFile={async (file) => setPhoto(id, await fitImage(await readFileAsDataUrl(file), box.w, box.h))}
+        crop={normalizeCrop(f.photoCrops[id])}
+        onFile={async (file) => setPhoto(id, await prepareSlotPhoto(await readFileAsDataUrl(file), box.w, box.h))}
         onReset={() => setPhoto(id, undefined)}
         onPreview={(src, l) => setLightbox({ src, label: l })}
+        onAdjust={(src) => setAdjusting({ id, src, label })}
       />
     );
   };
@@ -219,7 +526,8 @@ export function QuotationPdfSettings({ data, update }: { data: Platform; update:
           <h2 className="text-2xl">Edit quotation PDF format</h2>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
             Pages 1–3 are your portfolio pages. Photos are cropped to fit their slot and compressed, so any image works.
-            Slots without an upload use the default photos.
+            Use <strong>Adjust</strong> on any photo to choose which part shows and how much it is zoomed. Slots
+            without an upload use the default photos.
           </p>
         </div>
         <div className="flex gap-2">
@@ -322,6 +630,21 @@ export function QuotationPdfSettings({ data, update }: { data: Platform; update:
           </div>
         </div>
       </section>
+
+      {adjusting && (
+        <CropEditor
+          key={adjusting.id}
+          label={adjusting.label}
+          src={adjusting.src}
+          aspect={SLOT_BOXES[adjusting.id].w / SLOT_BOXES[adjusting.id].h}
+          initial={normalizeCrop(f.photoCrops[adjusting.id])}
+          onClose={() => setAdjusting(null)}
+          onSave={(crop) => {
+            setCrop(adjusting.id, crop);
+            setAdjusting(null);
+          }}
+        />
+      )}
 
       {lightbox && (
         <div

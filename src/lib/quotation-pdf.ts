@@ -46,7 +46,46 @@ export type PdfFormat = {
   contactLines: string;
   /** Uploaded photos (data URLs). A missing slot falls back to the default image. */
   photos: Partial<Record<PhotoSlotId, string>>;
+  /** How each photo is framed inside its slot. A missing slot is centred at zoom 1. */
+  photoCrops: Partial<Record<PhotoSlotId, PhotoCrop>>;
 };
+
+/**
+ * Framing of a photo inside its slot. `x`/`y` place the visible window within the part of the photo that does
+ * not fit (0 = left/top edge, 0.5 = centre, 1 = right/bottom edge); `zoom` 1 fills the slot, higher zooms in.
+ */
+export type PhotoCrop = { x: number; y: number; zoom: number };
+export const DEFAULT_CROP: PhotoCrop = { x: 0.5, y: 0.5, zoom: 1 };
+export const MAX_ZOOM = 4;
+
+const clamp = (n: number, lo: number, hi: number) => (Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : lo);
+
+/** Clamps a stored crop to valid values (anything missing or broken falls back to the centred default). */
+export const normalizeCrop = (crop: Partial<PhotoCrop> | undefined): PhotoCrop => ({
+  x: clamp(crop?.x ?? DEFAULT_CROP.x, 0, 1),
+  y: clamp(crop?.y ?? DEFAULT_CROP.y, 0, 1),
+  zoom: clamp(crop?.zoom ?? DEFAULT_CROP.zoom, 1, MAX_ZOOM),
+});
+
+export const isDefaultCrop = (crop: Partial<PhotoCrop> | undefined) => {
+  const c = normalizeCrop(crop);
+  return c.x === DEFAULT_CROP.x && c.y === DEFAULT_CROP.y && c.zoom === DEFAULT_CROP.zoom;
+};
+
+/**
+ * The part of a `srcW` x `srcH` image that is visible in a box of aspect `boxAspect` (width / height): a cover fit
+ * (never stretched), zoomed in by `crop.zoom` and shifted by `crop.x` / `crop.y`.
+ */
+export function cropRect(srcW: number, srcH: number, boxAspect: number, crop?: Partial<PhotoCrop>) {
+  const c = normalizeCrop(crop);
+  let sw = srcW;
+  let sh = srcH;
+  if (srcW / srcH > boxAspect) sw = sh * boxAspect;
+  else sh = sw / boxAspect;
+  sw /= c.zoom;
+  sh /= c.zoom;
+  return { sx: (srcW - sw) * c.x, sy: (srcH - sh) * c.y, sw, sh };
+}
 
 // Layout is in millimetres on A4.
 export const PAGE = { w: 210, h: 297, margin: 16 };
@@ -145,6 +184,7 @@ export const defaultPdfFormat = (studio: {
     .filter(Boolean)
     .join("\n"),
   photos: {},
+  photoCrops: {},
 });
 
 export const resolvePdfFormat = (
@@ -152,7 +192,12 @@ export const resolvePdfFormat = (
   studio: Parameters<typeof defaultPdfFormat>[0],
 ): PdfFormat => {
   const base = defaultPdfFormat(studio);
-  const merged = { ...base, ...(saved || {}), photos: { ...(saved?.photos || {}) } };
+  const merged = {
+    ...base,
+    ...(saved || {}),
+    photos: { ...(saved?.photos || {}) },
+    photoCrops: { ...(saved?.photoCrops || {}) },
+  };
   // A cleared heading or tagline falls back to the default instead of printing nothing.
   (["preHeading", "weddingHeading", "packagesHeading", "summaryHeading", "termsHeading"] as const).forEach((k) => {
     if (!merged[k].trim()) merged[k] = base[k];
@@ -184,27 +229,21 @@ export const readFileAsDataUrl = (file: File) =>
   });
 
 /**
- * Centre-crops an image to the target aspect ratio (cover fit, never stretched) and re-encodes it as a
- * JPEG sized for the slot. Returns the source unchanged when it already fits.
+ * Crops an image to the target aspect ratio (cover fit, never stretched) using `opts.crop` for position and
+ * zoom (centred by default), and re-encodes it as a JPEG sized for the slot.
  */
 export async function fitImage(
   src: string,
   wMm: number,
   hMm: number,
-  opts: { dpi?: number; quality?: number; format?: "jpeg" | "png" } = {},
+  opts: { dpi?: number; quality?: number; format?: "jpeg" | "png"; crop?: Partial<PhotoCrop> | undefined } = {},
 ): Promise<string> {
   const img = await loadImage(src);
   const dpi = opts.dpi ?? PHOTO_DPI;
-  const outW = Math.min(mmToPx(wMm, dpi), img.naturalWidth);
-  const outH = Math.round(outW * (hMm / wMm));
-  const srcAspect = img.naturalWidth / img.naturalHeight;
-  const dstAspect = wMm / hMm;
-  let sw = img.naturalWidth;
-  let sh = img.naturalHeight;
-  if (srcAspect > dstAspect) sw = sh * dstAspect;
-  else sh = sw / dstAspect;
-  const sx = (img.naturalWidth - sw) / 2;
-  const sy = (img.naturalHeight - sh) / 2;
+  const { sx, sy, sw, sh } = cropRect(img.naturalWidth, img.naturalHeight, wMm / hMm, opts.crop);
+  // Never upscale past the pixels actually available in the visible window.
+  const outW = Math.max(1, Math.min(mmToPx(wMm, dpi), Math.round(sw)));
+  const outH = Math.max(1, Math.round(outW * (hMm / wMm)));
   const canvas = document.createElement("canvas");
   canvas.width = outW;
   canvas.height = outH;
@@ -218,6 +257,33 @@ export async function fitImage(
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
   return canvas.toDataURL(opts.format === "png" ? "image/png" : "image/jpeg", opts.quality ?? JPEG_QUALITY);
+}
+
+/** Extra resolution kept on uploads so a zoomed-in crop still prints sharply. */
+const SOURCE_HEADROOM = 1.5;
+const SOURCE_MAX_PX = 2400;
+
+/**
+ * Prepares an upload for a photo slot: keeps the whole picture (so it can be re-framed later) but scales it down
+ * to just what the slot needs, plus headroom for zooming, and re-encodes it as a JPEG.
+ */
+export async function prepareSlotPhoto(src: string, wMm: number, hMm: number): Promise<string> {
+  const img = await loadImage(src);
+  const nw = img.naturalWidth;
+  const nh = img.naturalHeight;
+  // Scale at which the photo just covers the slot at print resolution.
+  const cover = Math.max(mmToPx(wMm) / nw, mmToPx(hMm) / nh);
+  const scale = Math.min(1, cover * SOURCE_HEADROOM, SOURCE_MAX_PX / Math.max(nw, nh));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(nw * scale));
+  canvas.height = Math.max(1, Math.round(nh * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Image processing is not available in this browser");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.82);
 }
 
 /** Logos and QR codes are scaled down to fit inside a box without cropping. */
@@ -326,7 +392,7 @@ async function prepareSlots(input: QuotationPdfInput) {
       const src = input.format.photos[id] || input.defaultPhotos[i % Math.max(1, input.defaultPhotos.length)];
       if (!src) return;
       try {
-        out.set(id, await fitImage(await fetchAsDataUrl(src), box.w, box.h));
+        out.set(id, await fitImage(await fetchAsDataUrl(src), box.w, box.h, { crop: input.format.photoCrops?.[id] }));
       } catch {
         // A slot that cannot be loaded keeps its tinted placeholder.
       }
