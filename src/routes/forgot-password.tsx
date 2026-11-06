@@ -22,7 +22,7 @@ function Forgot() {
     setTimeout(() => { setLoading(false); setSent(true); }, 600);
   };
   return (
-    <AuthShell image={editing} quote="Deadlines used to live in my head. Now the whole team can see them." credit="Neha Kulkarni · Saffron Stories, Mumbai">
+    <AuthShell image={editing} quote="I can manage my clients and bookings in one place." credit="Neha Kulkarni · Saffron Stories, Mumbai">
       {sent ? (
         <div>
           <MailCheck className="h-10 w-10 text-olive" />

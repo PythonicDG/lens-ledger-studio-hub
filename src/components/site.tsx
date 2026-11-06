@@ -38,7 +38,7 @@ export function SiteFooter() {
           <p className="mt-4 max-w-xs text-sm text-ivory/60">The operating system for India's photography studios. Made in Pune.</p>
         </div>
         {[
-          ["Product", ["Enquiries", "Bookings", "Editing pipeline", "Billing & GST"]],
+          ["Product", ["Quotations", "Bookings", "Billing & GST"]],
           ["Studios", ["Wedding", "Maternity & baby", "Corporate", "Fashion"]],
           ["Company", ["About", "Careers", "Support", "Privacy"]],
         ].map(([h, items]) => (

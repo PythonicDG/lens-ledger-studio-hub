@@ -18,6 +18,8 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as TrialRouteImport } from './routes/trial'
 import { Route as WelcomeRouteImport } from './routes/welcome'
+import { Route as AppSectionRouteImport } from './routes/app.$section'
+import { Route as QuoteQuoteIdRouteImport } from './routes/quote.$quoteId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +66,16 @@ const WelcomeRoute = WelcomeRouteImport.update({
   path: '/welcome',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppSectionRoute = AppSectionRouteImport.update({
+  id: '/app/$section',
+  path: '/app/$section',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuoteQuoteIdRoute = QuoteQuoteIdRouteImport.update({
+  id: '/quote/$quoteId',
+  path: '/quote/$quoteId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +87,8 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/trial': typeof TrialRoute
   '/welcome': typeof WelcomeRoute
+  '/app/$section': typeof AppSectionRoute
+  '/quote/$quoteId': typeof QuoteQuoteIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +100,8 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/trial': typeof TrialRoute
   '/welcome': typeof WelcomeRoute
+  '/app/$section': typeof AppSectionRoute
+  '/quote/$quoteId': typeof QuoteQuoteIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +114,8 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/trial': typeof TrialRoute
   '/welcome': typeof WelcomeRoute
+  '/app/$section': typeof AppSectionRoute
+  '/quote/$quoteId': typeof QuoteQuoteIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +129,8 @@ export interface FileRouteTypes {
     | '/setup'
     | '/trial'
     | '/welcome'
+    | '/app/$section'
+    | '/quote/$quoteId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +142,8 @@ export interface FileRouteTypes {
     | '/setup'
     | '/trial'
     | '/welcome'
+    | '/app/$section'
+    | '/quote/$quoteId'
   id:
     | '__root__'
     | '/'
@@ -133,6 +155,8 @@ export interface FileRouteTypes {
     | '/setup'
     | '/trial'
     | '/welcome'
+    | '/app/$section'
+    | '/quote/$quoteId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +169,8 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   TrialRoute: typeof TrialRoute
   WelcomeRoute: typeof WelcomeRoute
+  AppSectionRoute: typeof AppSectionRoute
+  QuoteQuoteIdRoute: typeof QuoteQuoteIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +238,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WelcomeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/$section': {
+      id: '/app/$section'
+      path: '/app/$section'
+      fullPath: '/app/$section'
+      preLoaderRoute: typeof AppSectionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quote/$quoteId': {
+      id: '/quote/$quoteId'
+      path: '/quote/$quoteId'
+      fullPath: '/quote/$quoteId'
+      preLoaderRoute: typeof QuoteQuoteIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -225,6 +265,8 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   TrialRoute: TrialRoute,
   WelcomeRoute: WelcomeRoute,
+  AppSectionRoute: AppSectionRoute,
+  QuoteQuoteIdRoute: QuoteQuoteIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

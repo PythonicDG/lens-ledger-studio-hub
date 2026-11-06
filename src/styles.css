@@ -138,3 +138,66 @@
 @keyframes rise { from { opacity: 0; transform: translateY(24px) } to { opacity: 1; transform: none } }
 @utility animate-rise { animation: rise .9s cubic-bezier(.2,.7,.2,1) both; }
 @layer base { body { font-family: var(--font-sans); } h1,h2,h3 { font-family: var(--font-display); } }
+
+@media (max-width: 639px) {
+  main input,
+  main select,
+  main textarea,
+  [role="dialog"] input,
+  [role="dialog"] select,
+  [role="dialog"] textarea {
+    font-size: 1rem;
+  }
+
+  .responsive-table {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .responsive-table table,
+  .responsive-table tbody,
+  .responsive-table tr,
+  .responsive-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .responsive-table thead {
+    display: none;
+  }
+
+  .responsive-table tbody {
+    border: 0;
+  }
+
+  .responsive-table tr {
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    background: white;
+  }
+
+  .responsive-table td {
+    padding: 0.65rem 1rem;
+    overflow-wrap: anywhere;
+  }
+
+  .responsive-table td + td {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .responsive-table td[data-label]:not([data-label=""])::before {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: var(--color-muted-foreground);
+    content: attr(data-label);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}

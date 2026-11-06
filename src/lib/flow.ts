@@ -44,7 +44,7 @@ export const PLANS = [
     monthly: 999,
     yearly: 799,
     tagline: "For freelance photographers",
-    features: ["1 user", "Enquiries & client records", "Quotations & invoices with GST", "50 bookings / month", "WhatsApp reminders"],
+    features: ["1 user", "Client records from quotations", "Quotations & invoices with GST", "50 bookings / month", "WhatsApp reminders"],
   },
   {
     id: "studio",
@@ -53,7 +53,7 @@ export const PLANS = [
     yearly: 1999,
     tagline: "For growing wedding studios",
     featured: true,
-    features: ["Up to 8 team members", "Everything in Solo", "Shoot calendar & crew assignment", "Editing pipeline & deadlines", "Client delivery galleries", "Profit per project"],
+    features: ["Up to 8 team members", "Everything in Solo", "Shoot calendar & crew assignment", "Profit per project"],
   },
   {
     id: "collective",

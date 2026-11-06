@@ -80,7 +80,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "FrameFlow — Studio management for Indian photographers" },
-      { name: "description", content: "Enquiries, quotations, bookings, shoots, editing, delivery and billing for photography studios in one place." },
+      { name: "description", content: "Quotations, bookings, shoots and billing for photography studios in one place." },
       { property: "og:title", content: "FrameFlow" },
       { property: "og:description", content: "One organised system for Indian photography studios." },
       { property: "og:type", content: "website" },

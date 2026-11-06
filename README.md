@@ -4,7 +4,11 @@ Build FrameFlow, a premium ERP/SaaS for Indian photography studios to manage the
 
 Pages: Landing, pricing, register, login, forgot password, studio setup, plan selection and welcome checklist.
 
-Core message: Help visitors instantly understand that FrameFlow replaces scattered WhatsApp chats, spreadsheets and manual paperwork with one organized system for client records, enquiries, quotations, bookings, shoot management, team coordination, editing deadlines, delivery, billing and profit tracking. Clearly communicate how it saves time, prevents missed leads and payments, and helps studios run more profitably.
+The post-login workspace includes overview, enquiries, clients, services, packages, quotations, bookings and shoot checklists, calendar, team, payments, studio profile and settings. Quotations, invoices and receipts can be downloaded as PDFs. Published quotations have client decision pages.
+
+Start the Django backend in `../photography-managment-backend` and run its migrations for registration, public quote decisions and document email. Set `VITE_API_URL` when the backend is on a different origin. Core workspace records currently use browser localStorage for the signed-in studio; published quote snapshots and their decisions are stored in Django. Configure the backend SMTP settings to deliver invoice and receipt emails outside development.
+
+Core message: Help visitors instantly understand that FrameFlow replaces scattered WhatsApp chats, spreadsheets and manual paperwork with one organized system for client records, enquiries, quotations, bookings, shoot management, team coordination, billing and profit tracking. Clearly communicate how it saves time, prevents missed leads and payments, and helps studios run more profitably.
 
 Design: Premium editorial photography aesthetic, not a generic AI-generated SaaS template. Use cinematic wedding photos, studio portraits, behind-the-scenes images, overlapping collages, asymmetrical layouts, bold typography and realistic dashboard mockups. Avoid repetitive cards and standard centered hero sections.
 
