@@ -6,7 +6,7 @@ import { AuthShell, Field, SubmitButton, type Errs } from "@/components/auth-she
 import { ApiError, registerAccount } from "@/lib/auth";
 
 export const Route = createFileRoute("/register")({
-  head: () => ({ meta: [{ title: "Create your studio account — FrameFlow" }, { name: "description", content: "Start your 14-day FrameFlow free trial." }, { property: "og:title", content: "Join FrameFlow" }, { property: "og:description", content: "Start your 14-day free trial." }] }),
+  head: () => ({ meta: [{ title: "Create your studio account — FrameFlow" }, { name: "description", content: "Start your 15-day FrameFlow free trial." }, { property: "og:title", content: "Join FrameFlow" }, { property: "og:description", content: "Start your 15-day free trial." }] }),
   component: Register,
 });
 
@@ -49,7 +49,7 @@ function Register() {
 
   return (
     <AuthShell image={hero} quote="Our enquiries finally have a home. We closed 9 extra weddings in our first season." credit="Priya Nair · Kochi Frames, Kerala" step={1}>
-      <p className="eyebrow text-olive">14-day free trial</p>
+      <p className="eyebrow text-olive">15-day free trial</p>
       {registeredEmail ? <>
         <h1 className="mt-3 text-3xl sm:text-4xl">Check your email</h1>
         <p className="mt-4 text-sm text-muted-foreground">We sent a verification link to <strong className="break-all text-foreground">{registeredEmail}</strong>. Open it to verify your account, then log in to set up your studio.</p>

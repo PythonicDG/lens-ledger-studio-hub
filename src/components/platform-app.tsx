@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  SUBSCRIPTION_REQUIRED_EVENT,
   emailDocument,
   getAuthToken,
   listSharedQuotes,
@@ -37,6 +38,8 @@ import { getStudio, saveStudio } from "@/lib/flow";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildQuotationFor } from "@/lib/quotation-pdf";
 import { QuotationPdfSettings } from "@/components/quotation-pdf-settings";
+import { SubscriptionSettings } from "@/components/subscription-settings";
+import { SUBSCRIPTION_CHANGED_EVENT, fetchSubscription, subscriptionSummary, type Subscription } from "@/lib/billing";
 import {
   addStarterServices,
   assignmentPaid,
@@ -132,7 +135,7 @@ const subtitle: Record<Section, string> = {
   assists: "Shoots you did for other photographers: fees, payments and what is still owed.",
   team: "The people who make each shoot happen.",
   studio: "Your brand and business details.",
-  settings: "Defaults for documents and billing.",
+  settings: "Document defaults, your subscription and account.",
 };
 const today = () => {
   const date = new Date();
@@ -148,6 +151,9 @@ const tableAction =
   "inline-flex min-h-9 items-center justify-center rounded-lg border border-olive/50 bg-olive-soft/40 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:border-olive hover:bg-olive hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-olive focus-visible:ring-offset-2 active:bg-foreground";
 const card = "rounded-2xl border border-border/80 bg-white shadow-[0_5px_30px_rgba(30,34,25,.035)]";
 const link = (s: Section) => (s === "dashboard" ? "/welcome" : `/app/${s}`);
+const SUBSCRIPTION_URL = "/app/settings?tab=subscription";
+/** Modals that only show information stay available when the workspace is read-only. */
+const VIEW_ONLY_MODALS = new Set(["quotePreview", "invoice", "teamDetail", "assistDetail"]);
 
 function Label({ children }: { children: ReactNode }) {
   return <span className="mb-1.5 block text-xs font-semibold text-foreground/75">{children}</span>;
@@ -380,6 +386,26 @@ export function PlatformApp({ section = "dashboard" }: { section?: string }) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [settingsTab, setSettingsTab] = useState("general");
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab && ["general", "pdf", "subscription"].includes(tab)) setSettingsTab(tab);
+  }, []);
+  useEffect(() => {
+    if (!getAuthToken()) return;
+    const refresh = () => fetchSubscription().then(setSubscription).catch(() => {});
+    const changed = (event: Event) => setSubscription((event as CustomEvent<Subscription>).detail);
+    void refresh();
+    window.addEventListener("focus", refresh);
+    window.addEventListener(SUBSCRIPTION_REQUIRED_EVENT, refresh);
+    window.addEventListener(SUBSCRIPTION_CHANGED_EVENT, changed);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener(SUBSCRIPTION_REQUIRED_EVENT, refresh);
+      window.removeEventListener(SUBSCRIPTION_CHANGED_EVENT, changed);
+    };
+  }, []);
   useEffect(() => {
     if (!getAuthToken()) nav({ to: "/login" });
     else if (!getStudio().studioName) nav({ to: "/setup" });
@@ -418,7 +444,23 @@ export function PlatformApp({ section = "dashboard" }: { section?: string }) {
       window.clearInterval(quoteRefresh);
     };
   }, []);
+  // The server rejects writes once the trial or plan has ended; block them here too so nothing is
+  // changed locally that could never be saved.
+  const readOnly = subscription !== null && !subscription.has_access;
+  const goToSubscription = () => {
+    if (current === "settings") setSettingsTab("subscription");
+    else window.location.href = SUBSCRIPTION_URL;
+  };
+  const blockedByPlan = () => {
+    if (!readOnly) return false;
+    toast.error("Your workspace is read-only.", {
+      description: subscription?.state === "suspended" ? "Please contact support." : "Choose a plan to keep making changes.",
+      action: subscription?.state === "suspended" ? undefined : { label: "Choose plan", onClick: goToSubscription },
+    });
+    return true;
+  };
   const update = (next: Platform) => {
+    if (blockedByPlan()) return;
     setData(next);
     savePlatform(next);
   };
@@ -451,6 +493,7 @@ export function PlatformApp({ section = "dashboard" }: { section?: string }) {
     open("quote", revision.id);
   };
   const open = (name: string, id = "") => {
+    if (!VIEW_ONLY_MODALS.has(name) && blockedByPlan()) return;
     setSelected(id);
     setModal(name);
   };
@@ -577,15 +620,50 @@ export function PlatformApp({ section = "dashboard" }: { section?: string }) {
             <span className="truncate text-xs font-semibold">{title[current]}</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="hidden rounded-full bg-[#e7efe3] px-3 py-1.5 text-[11px] font-semibold text-[#527250] sm:block">
-              ● Free trial
-            </span>
+            {subscription && (
+              <a
+                href={SUBSCRIPTION_URL}
+                onClick={(event) => {
+                  event.preventDefault();
+                  goToSubscription();
+                }}
+                className={`hidden rounded-full px-3 py-1.5 text-[11px] font-semibold transition hover:opacity-80 sm:block ${
+                  subscription.has_access
+                    ? subscription.state === "grace"
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-[#e7efe3] text-[#527250]"
+                    : "bg-rose-50 text-rose-700"
+                }`}
+              >
+                ●{" "}
+                {subscription.state === "trialing"
+                  ? `Free trial · ${subscription.days_left} day${subscription.days_left === 1 ? "" : "s"} left`
+                  : subscription.state === "active"
+                    ? `${subscription.plan?.name ?? "Paid"} plan`
+                    : subscription.state_label}
+              </a>
+            )}
             <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d9dfd3] bg-white text-xs font-bold">
               {(studio.ownerName || "S").slice(0, 1)}
             </span>
           </div>
         </header>
         <main className="mx-auto max-w-[1380px] px-4 pb-20 pt-6 sm:px-8 sm:pt-8 lg:px-10">
+          {subscription && (readOnly || subscription.state === "grace" || (subscription.state === "trialing" && subscription.days_left <= 3)) && (
+            <div
+              role="status"
+              className={`mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-5 py-4 text-sm ${
+                readOnly ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-800"
+              }`}
+            >
+              <span className="min-w-0 flex-1">{subscriptionSummary(subscription)}</span>
+              {subscription.state !== "suspended" && !(current === "settings" && settingsTab === "subscription") && (
+                <button className={btn} onClick={goToSubscription}>
+                  {readOnly ? "Choose a plan" : "View plans"} <ArrowRight size={15} />
+                </button>
+              )}
+            </div>
+          )}
           <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="mb-2 text-[10px] font-bold uppercase tracking-[.18em] text-olive">
@@ -1274,10 +1352,11 @@ export function PlatformApp({ section = "dashboard" }: { section?: string }) {
             />
           )}
           {current === "settings" && (
-            <Tabs defaultValue="general">
+            <Tabs value={settingsTab} onValueChange={setSettingsTab}>
               <TabsList className="mb-5">
                 <TabsTrigger value="general">General</TabsTrigger>
                 <TabsTrigger value="pdf">Edit quotation PDF format</TabsTrigger>
+                <TabsTrigger value="subscription">Subscription</TabsTrigger>
               </TabsList>
               <TabsContent value="general">
                 <SettingsForm data={data} update={update} />
@@ -1286,6 +1365,9 @@ export function PlatformApp({ section = "dashboard" }: { section?: string }) {
                 <div className={`${card} p-6 sm:p-8`}>
                   <QuotationPdfSettings data={data} update={update} />
                 </div>
+              </TabsContent>
+              <TabsContent value="subscription">
+                <SubscriptionSettings subscription={subscription} onChange={setSubscription} />
               </TabsContent>
             </Tabs>
           )}

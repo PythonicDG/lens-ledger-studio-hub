@@ -13,7 +13,16 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(
+/** Fired when the server answers 402: the trial or plan has ended and the workspace is read-only. */
+export const SUBSCRIPTION_REQUIRED_EVENT = "frameflow:subscription-required";
+
+function notifyIfSubscriptionRequired(status: number) {
+  if (status === 402 && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SUBSCRIPTION_REQUIRED_EVENT));
+  }
+}
+
+export async function request<T>(
   path: string,
   body: unknown,
   method = "POST",
@@ -35,6 +44,7 @@ async function request<T>(
 
   const data = response.status === 204 ? null : await response.json();
   if (!response.ok) {
+    notifyIfSubscriptionRequired(response.status);
     const fields: Record<string, string> = {};
     for (const [key, value] of Object.entries(data)) {
       if (Array.isArray(value)) fields[key] = String(value[0]);
@@ -215,8 +225,10 @@ export async function emailDocument(recipient: string, kind: "invoice" | "receip
     body: form,
   });
   const result = await response.json();
-  if (!response.ok)
+  if (!response.ok) {
+    notifyIfSubscriptionRequired(response.status);
     throw new ApiError(result.detail || "Could not send document.", {}, response.status);
+  }
   return result as { detail: string };
 }
 
@@ -243,7 +255,9 @@ export async function whatsappQuotation(
     throw new ApiError("Cannot reach the server. Please try again.");
   }
   const result = await response.json();
-  if (!response.ok)
+  if (!response.ok) {
+    notifyIfSubscriptionRequired(response.status);
     throw new ApiError(result.detail || "Could not send on WhatsApp.", {}, response.status);
+  }
   return result as { detail: string; message_id: string };
 }

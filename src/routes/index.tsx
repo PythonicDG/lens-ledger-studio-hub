@@ -58,7 +58,7 @@ function Landing() {
                 to="/register"
                 className="group inline-flex items-center gap-2 rounded-full bg-primary px-7 py-4 text-sm font-medium text-primary-foreground transition hover:bg-olive"
               >
-                Start 14-day free trial{" "}
+                Start 15-day free trial{" "}
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
               </Link>
               <Link
