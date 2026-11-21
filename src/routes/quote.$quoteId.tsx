@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Check, MessageSquare, X } from "lucide-react";
 import { toast } from "sonner";
 import { decidePublicQuote, fetchPublicQuote, type PublicQuote } from "@/lib/auth";
-import { formatDate, money } from "@/lib/platform";
+import { formatDateRange, money } from "@/lib/platform";
 
 export const Route = createFileRoute("/quote/$quoteId")({ component: QuoteDecision });
 
@@ -59,7 +59,7 @@ function QuoteDecision() {
               </p>
               <h2 className="mt-2 text-2xl">{q.event}</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                For {q.client_name} · {formatDate(q.date)}
+                For {q.client_name} · {formatDateRange(q.date, q.end_date)}
               </p>
               <p className="text-sm text-muted-foreground">{q.location}</p>
             </div>

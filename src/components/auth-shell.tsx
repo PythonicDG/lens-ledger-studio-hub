@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Logo } from "./site";
 
-export function AuthShell({ image, quote, credit, step, children }: { image: string; quote: string; credit: string; step?: number; children: ReactNode }) {
+export function AuthShell({ image, tagline, step, children }: { image: string; tagline: string; step?: number; children: ReactNode }) {
   return (
     <div className="grid min-h-screen lg:grid-cols-[1fr_1.1fr]">
       <div className="relative hidden overflow-hidden bg-ink lg:block">
@@ -9,10 +9,7 @@ export function AuthShell({ image, quote, credit, step, children }: { image: str
         <div className="absolute inset-0 bg-fade" />
         <div className="relative flex h-full flex-col justify-between p-10">
           <Logo light />
-          <blockquote className="max-w-md text-ivory">
-            <p className="font-display text-3xl italic leading-snug">“{quote}”</p>
-            <footer className="mt-4 text-sm text-ivory/70">{credit}</footer>
-          </blockquote>
+          <p className="max-w-md font-display text-3xl italic leading-snug text-ivory">{tagline}</p>
         </div>
       </div>
       <div className="flex min-w-0 flex-col px-4 py-6 sm:px-10 sm:py-8 lg:px-12">

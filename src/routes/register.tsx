@@ -48,7 +48,7 @@ function Register() {
   };
 
   return (
-    <AuthShell image={hero} quote="Our enquiries finally have a home. We closed 9 extra weddings in our first season." credit="Priya Nair · Kochi Frames, Kerala" step={1}>
+    <AuthShell image={hero} tagline="Quotations, bookings, shoots and payments for your studio, in one place." step={1}>
       <p className="eyebrow text-olive">15-day free trial</p>
       {registeredEmail ? <>
         <h1 className="mt-3 text-3xl sm:text-4xl">Check your email</h1>
@@ -63,7 +63,7 @@ function Register() {
         <Field label="Mobile (WhatsApp)" type="tel" placeholder="98220 41567" value={f.phone} onChange={set("phone")} error={e.phone} />
         <Field label="Password" type="password" placeholder="Min. 8 characters" value={f.password} onChange={set("password")} error={e.password} />
         <SubmitButton loading={loading}>Create account</SubmitButton>
-        <p className="text-center text-xs text-muted-foreground">By continuing you agree to our Terms and Privacy Policy.</p>
+        <p className="text-center text-xs text-muted-foreground">By creating an account you agree to our <Link to="/terms" className="underline underline-offset-2 hover:text-foreground">Terms &amp; Conditions</Link> and <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">Privacy Policy</Link>.</p>
       </form>
       </>}
     </AuthShell>

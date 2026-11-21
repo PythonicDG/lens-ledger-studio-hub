@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 import { inr } from "@/lib/flow";
 import { monthlyEquivalent, type BillingCycle, type Plan } from "@/lib/billing";
 
-export function PlanGrid({ plans, billing, selected, onSelect, cta }: { plans: Plan[]; billing: BillingCycle; selected?: string; onSelect: (slug: string) => void; cta: string }) {
+export function PlanGrid({ plans, billing, gstPercent, selected, onSelect, cta }: { plans: Plan[]; billing: BillingCycle; gstPercent: number; selected?: string; onSelect: (slug: string) => void; cta: string }) {
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       {plans.map((p) => {
@@ -11,13 +11,13 @@ export function PlanGrid({ plans, billing, selected, onSelect, cta }: { plans: P
         const perMonth = monthlyEquivalent(p, billing);
         return (
           <div key={p.slug} className={`relative flex flex-col rounded-md border p-8 transition ${featured ? "bg-ink text-ivory lg:-translate-y-4 border-ink" : "bg-card border-border"} ${active ? "ring-2 ring-olive" : ""}`}>
-            {featured && <span className="absolute -top-3 left-8 rounded-full bg-ember px-3 py-1 text-[10px] uppercase tracking-widest text-ivory">Most studios pick this</span>}
+            {featured && <span className="absolute -top-3 left-8 rounded-full bg-ember px-3 py-1 text-[10px] uppercase tracking-widest text-ivory">Recommended</span>}
             <p className="font-display text-3xl">{p.name}</p>
             <p className={`mt-1 text-sm ${featured ? "text-ivory/60" : "text-muted-foreground"}`}>{p.tagline}</p>
             {perMonth ? (
               <>
                 <p className="mt-8 font-display text-5xl">{inr(perMonth)}<span className="font-sans text-sm opacity-60"> /month</span></p>
-                <p className="mt-1 text-xs opacity-60">{billing === "yearly" ? "billed annually · + GST" : "billed monthly · + GST"}</p>
+                <p className="mt-1 text-xs opacity-60">{billing === "yearly" ? "billed annually" : "billed monthly"}{gstPercent > 0 ? " · + GST" : ""}</p>
               </>
             ) : (
               <p className="mt-8 text-sm opacity-60">Available with {billing === "yearly" ? "monthly" : "yearly"} billing</p>

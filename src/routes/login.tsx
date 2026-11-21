@@ -61,7 +61,7 @@ function Login() {
   };
 
   return (
-    <AuthShell image={portrait} quote="I used to spend Sunday nights on invoices. Now I spend them with my family." credit="Imran Shaikh · Lightbox Portraits, Hyderabad">
+    <AuthShell image={portrait} tagline="Your quotations, bookings and payments, right where you left them.">
       <h1 className="text-4xl">Welcome back.</h1>
       <p className="mt-2 text-sm text-muted-foreground">New to FrameFlow? <Link to="/register" className="text-foreground underline underline-offset-4">Start free trial</Link></p>
       <form onSubmit={submit} className="mt-8 space-y-4" noValidate>

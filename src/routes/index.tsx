@@ -69,7 +69,7 @@ function Landing() {
               </Link>
             </div>
             <p className="mt-6 text-xs text-muted-foreground">
-              No card required · Setup in 10 minutes · Trusted by 1,200+ studios
+              No card required · 15-day free trial · Cancel anytime
             </p>
           </div>
           <div className="relative h-[520px] lg:col-span-6 lg:h-[640px]">
@@ -115,7 +115,7 @@ function Landing() {
               [
                 MessageCircle,
                 "Leads lost in WhatsApp",
-                "Studios miss 1 in 4 enquiries because nobody followed up.",
+                "Enquiries get buried in chats when nobody follows up.",
               ],
               [
                 FileSpreadsheet,
@@ -147,9 +147,9 @@ function Landing() {
             <ul className="mt-8 space-y-4 text-sm">
               {[
                 "Revenue, dues and profit per shoot — live",
-                "Every client's history, contracts and invoices",
-                "GST-ready quotations and invoices",
-                "WhatsApp reminders for payments and dates",
+                "Every client's history, quotations and invoices",
+                "Branded quotation and invoice PDFs",
+                "Send quotations to clients on WhatsApp",
               ].map((f) => (
                 <li key={f} className="flex gap-3">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-olive" />
@@ -245,30 +245,6 @@ function Landing() {
               <p className="mt-2 text-ivory/80">{l}</p>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* TESTIMONIAL */}
-      <section className="py-28">
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 md:grid-cols-[1fr_2fr]">
-          <img
-            src={portrait}
-            alt="Rahul Deshmukh"
-            width={896}
-            height={1152}
-            loading="lazy"
-            className="aspect-[4/5] w-full rounded-sm object-cover"
-          />
-          <blockquote>
-            <p className="font-display text-3xl leading-snug sm:text-4xl">
-              “We shot 64 weddings last season with a team of nine. FrameFlow is the reason nobody
-              missed a muhurat — and every rupee got collected.”
-            </p>
-            <footer className="mt-6 text-sm">
-              <span className="font-medium">Rahul Deshmukh</span>{" "}
-              <span className="text-muted-foreground">· Founder, Lenscraft Studio, Pune</span>
-            </footer>
-          </blockquote>
         </div>
       </section>
 

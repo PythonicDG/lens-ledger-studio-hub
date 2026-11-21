@@ -8,7 +8,8 @@ const seeded = (): Platform => addStarterServices(getPlatform());
 const fillBasics = () => {
   fireEvent.change(screen.getByLabelText("Client name *"), { target: { value: "Asha Rao" } });
   fireEvent.change(screen.getByLabelText("Phone *"), { target: { value: "9876543210" } });
-  fireEvent.change(screen.getByLabelText("Event date *"), { target: { value: "2026-12-12" } });
+  fireEvent.change(screen.getByLabelText("Event start date *"), { target: { value: "2026-12-12" } });
+  fireEvent.change(screen.getByLabelText("Event end date *"), { target: { value: "2026-12-14" } });
   fireEvent.change(screen.getByLabelText("Venue *"), { target: { value: "Pune" } });
 };
 const addPackage = (name: string) => {
@@ -26,7 +27,8 @@ describe("quotation form", () => {
     expect(update).not.toHaveBeenCalled();
     expect(screen.getByText("Enter the client name")).toBeInTheDocument();
     expect(screen.getByText("Enter a phone number")).toBeInTheDocument();
-    expect(screen.getByText("Pick the event date")).toBeInTheDocument();
+    expect(screen.getByText("Pick the event start date")).toBeInTheDocument();
+    expect(screen.getByText("Pick the event end date")).toBeInTheDocument();
     expect(screen.getByText("Enter the venue")).toBeInTheDocument();
     expect(screen.getByText("Add at least one package")).toBeInTheDocument();
   });
@@ -68,6 +70,7 @@ describe("quotation form", () => {
     const saved = update.mock.calls[0]![0] as Platform;
     const quote = saved.quotes[0]!;
     expect(saved.clients[0]).toMatchObject({ name: "Asha Rao", phone: "9876543210" });
+    expect(quote).toMatchObject({ date: "2026-12-12", endDate: "2026-12-14" });
     expect(quote.packages).toHaveLength(2);
     expect(quote.packages![1]!.countInTotal).toBe(false);
     expect(quote.discount).toBe(5000);
@@ -93,6 +96,17 @@ describe("quotation form", () => {
     const saved = update.mock.calls[0]![0] as Platform;
     expect(saved.quotes[0]!.packages![0]).toMatchObject({ title: "Gold for Asha", price: 80000 });
     expect(saved.packages.find((p) => p.name === "Wedding Gold")!.price).toBe(85000);
+  });
+
+  it("rejects an event end date before the start date", () => {
+    const update = vi.fn();
+    render(<QuoteForm data={seeded()} update={update} onClose={vi.fn()} />);
+    fillBasics();
+    addPackage("Wedding Bronze");
+    fireEvent.change(screen.getByLabelText("Event end date *"), { target: { value: "2026-12-10" } });
+    fireEvent.click(screen.getByText("Save quotation"));
+    expect(update).not.toHaveBeenCalled();
+    expect(screen.getAllByText("End date cannot be before the start date").length).toBeGreaterThan(0);
   });
 
   it("rejects a discount larger than the subtotal", () => {
@@ -129,7 +143,8 @@ describe("quotation form", () => {
     const saved = update.mock.calls[0]![0] as Platform;
     expect(saved.quotes).toHaveLength(1);
     expect(saved.clients).toHaveLength(1);
-    expect(saved.quotes[0]).toMatchObject({ location: "Goa", discount: 1000 });
+    // Quotations saved before multi-day events default the end date to the start date.
+    expect(saved.quotes[0]).toMatchObject({ location: "Goa", discount: 1000, endDate: "2026-11-01" });
     expect(saved.quotes[0]!.packages![0]!.price).toBe(30000);
   });
 });

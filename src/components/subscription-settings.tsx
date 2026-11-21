@@ -190,8 +190,10 @@ export function SubscriptionSettings({
                 {subscription.state === "active" ? "Renew or change plan" : "Choose a plan"}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Pay securely with UPI, card, net banking or wallet. Prices exclude{" "}
-                {catalog?.gst_percent ?? 18}% GST.
+                Pay securely with UPI, card, net banking or wallet.
+                {catalog && catalog.gst_percent > 0
+                  ? ` Prices exclude ${catalog.gst_percent}% GST.`
+                  : " The price shown is the total you pay."}
               </p>
             </div>
             {offersMonthly && offersYearly && (
@@ -269,8 +271,8 @@ export function SubscriptionSettings({
                         <span className="text-sm font-normal text-muted-foreground"> /month</span>
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {cycle === "yearly" ? `${inr(total)} billed yearly` : "Billed monthly"} · +
-                        GST
+                        {cycle === "yearly" ? `${inr(total)} billed yearly` : "Billed monthly"}
+                        {catalog && catalog.gst_percent > 0 ? " · + GST" : ""}
                       </p>
                     </>
                   ) : (
@@ -306,9 +308,28 @@ export function SubscriptionSettings({
               );
             })}
           </div>
-          <p className="mt-5 flex items-center gap-2 text-xs text-muted-foreground">
-            <ShieldCheck size={14} className="text-olive" />
-            Payments are processed by Razorpay. We never see or store your card or UPI details.
+          <p className="mt-5 text-xs leading-5 text-muted-foreground">
+            <ShieldCheck size={14} className="mr-1.5 inline-block align-[-2px] text-olive" />
+            Payments are processed securely by Razorpay. We never see or store your card or UPI
+            details. By paying you agree to our{" "}
+            <a
+              href="/terms"
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2"
+            >
+              Terms
+            </a>{" "}
+            and{" "}
+            <a
+              href="/refund-policy"
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2"
+            >
+              Refund &amp; Cancellation Policy
+            </a>
+            .
           </p>
         </section>
       )}
@@ -345,7 +366,11 @@ export function SubscriptionSettings({
                     </td>
                     <td
                       className="py-3 pr-4"
-                      title={`${paise(payment.base_amount)} + ${paise(payment.gst_amount)} GST`}
+                      title={
+                        payment.gst_amount
+                          ? `${paise(payment.base_amount)} + ${paise(payment.gst_amount)} GST`
+                          : undefined
+                      }
                     >
                       {paise(payment.total_amount)}
                     </td>

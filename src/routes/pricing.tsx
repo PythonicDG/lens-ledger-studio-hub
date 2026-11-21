@@ -17,8 +17,7 @@ export const Route = createFileRoute("/pricing")({
 });
 
 const faqs = [
-  ["Do invoices include GST?", "Yes. Add your GSTIN and every quotation and invoice is GST-compliant, with CGST/SGST/IGST split automatically."],
-  ["Can I import my existing clients?", "Upload an Excel or Google Sheet and we'll map it for you. Our team helps on Studio and Collective plans."],
+  ["Can my GSTIN appear on my documents?", "Yes. Add your GSTIN to your studio profile and it is printed on your quotations and invoices."],
   ["Can I pay via UPI?", "Yes — UPI, cards, net banking and wallets, securely through Razorpay."],
   ["What happens when my plan ends?", "Nothing is deleted. Your workspace becomes read-only until you renew, and you can still view all your data."],
 ];
@@ -46,7 +45,7 @@ function Pricing() {
         </div>
         <div className="mt-20">
           {catalog ? (
-            <PlanGrid plans={catalog.plans} billing={billing} cta="Start free trial" onSelect={() => nav({ to: "/register" })} />
+            <PlanGrid plans={catalog.plans} billing={billing} gstPercent={catalog.gst_percent} cta="Start free trial" onSelect={() => nav({ to: "/register" })} />
           ) : (
             <p className="text-center text-muted-foreground">{failed ? "Plans could not be loaded right now. Please refresh the page." : "Loading plans…"}</p>
           )}

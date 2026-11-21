@@ -27,11 +27,12 @@ describe("package quotation totals", () => {
   it("caps the discount at the subtotal and validates it", () => {
     const input = { packages: [pkg(1000, true)], discount: 5000 };
     expect(calcTotals(input).total).toBe(0);
-    const errors = validateQuote({ clientName: "A", phone: "9876543210", date: "2026-01-01", venue: "V", ...input });
+    const errors = validateQuote({ clientName: "A", phone: "9876543210", date: "2026-01-01", endDate: "2026-01-01", venue: "V", ...input });
     expect(errors.discount).toBeTruthy();
     expect(validateQuote({ clientName: "A", phone: "123", date: "", venue: "", packages: [] })).toMatchObject({
       phone: expect.any(String),
       date: expect.any(String),
+      endDate: expect.any(String),
       venue: expect.any(String),
       packages: expect.any(String),
     });

@@ -65,7 +65,7 @@ function Setup() {
   };
 
   return (
-    <AuthShell image={bts} quote="We onboarded our team of twelve in an afternoon." credit="Karan Sethi · Golden Hour Films, Jaipur" step={2}>
+    <AuthShell image={bts} tagline="Add your studio details once. Every quotation and invoice uses them." step={2}>
       <p className="eyebrow text-olive">Studio setup</p>
       <h1 className="mt-3 text-4xl">Make it yours.</h1>
       <p className="mt-2 text-sm text-muted-foreground">Name your studio. The other details can wait.</p>

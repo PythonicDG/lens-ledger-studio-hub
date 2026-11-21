@@ -6,6 +6,7 @@ import editing from "@/assets/editing.jpg";
 import { getStudio } from "./flow";
 import {
   formatDate,
+  formatDateRange,
   quotePackagesOf,
   quoteTotals,
   type Platform,
@@ -788,7 +789,7 @@ export function buildQuotationFor(
     version: q.version || 1,
     issued: formatDate(todayIso()),
     event: q.event,
-    eventDate: q.date ? formatDate(q.date) : "",
+    eventDate: q.date ? formatDateRange(q.date, q.endDate) : "",
     location: q.location,
     packages: quotePackagesOf(q),
     totals: quoteTotals(q),

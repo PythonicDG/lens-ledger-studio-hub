@@ -35,7 +35,7 @@ function Trial() {
   };
 
   return (
-    <AuthShell image={hero} quote="Our enquiries finally have a home. We closed 9 extra weddings in our first season." credit="Priya Nair · Kochi Frames, Kerala" step={3}>
+    <AuthShell image={hero} tagline="Try every feature free for 15 days. No card needed." step={3}>
       <p className="eyebrow text-olive">Step 3 · free trial</p>
       <h1 className="mt-3 text-4xl">Your studio is ready.</h1>
       <p className="mt-4 text-muted-foreground">Start a 15-day free trial for {studioName || "your studio"}. No card required.</p>

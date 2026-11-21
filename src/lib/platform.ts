@@ -74,7 +74,10 @@ export type Quote = {
   clientId: string;
   packageId: string;
   event: string;
+  /** Event start date. */
   date: string;
+  /** Event end date. Absent on quotations created before multi-day events; treat as `date`. */
+  endDate?: string | undefined;
   location: string;
   items: { name: string; price: number }[];
   packageDetails?: PackageDetails | undefined;
@@ -432,6 +435,10 @@ export const formatDate = (date: string) =>
       })
     : "—";
 
+/** "12 Dec 2026" for a single day, "12 Dec 2026 – 14 Dec 2026" for a range. */
+export const formatDateRange = (start: string, end?: string) =>
+  end && start && end !== start ? `${formatDate(start)} – ${formatDate(end)}` : formatDate(start);
+
 const STARTER_SERVICES: [string, string, number][] = [
   ["Traditional photographer", "Photography", 15000],
   ["Candid photographer", "Photography", 20000],
@@ -597,6 +604,7 @@ export type QuoteValidation = {
   clientName?: string;
   phone?: string;
   date?: string;
+  endDate?: string;
   venue?: string;
   packages?: string;
   discount?: string;
@@ -609,6 +617,7 @@ export function validateQuote(input: {
   clientName: string;
   phone: string;
   date: string;
+  endDate?: string | undefined;
   venue: string;
   packages: QuotePackage[];
   discount?: number | undefined;
@@ -619,7 +628,9 @@ export function validateQuote(input: {
   const digits = input.phone.replace(/\D/g, "");
   if (!input.phone.trim()) e.phone = "Enter a phone number";
   else if (digits.length < 10 || digits.length > 13) e.phone = "Enter a valid phone number";
-  if (!input.date) e.date = "Pick the event date";
+  if (!input.date) e.date = "Pick the event start date";
+  if (!input.endDate) e.endDate = "Pick the event end date";
+  else if (input.date && input.endDate < input.date) e.endDate = "End date cannot be before the start date";
   if (!input.venue.trim()) e.venue = "Enter the venue";
   if (!input.packages.length) e.packages = "Add at least one package";
   input.packages.forEach((p) => {

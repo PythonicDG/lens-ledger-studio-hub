@@ -147,6 +147,8 @@ export type PublicQuote = {
     event: string;
     client_name: string;
     date: string;
+    /** Absent on quotations shared before multi-day events. */
+    end_date?: string;
     location: string;
     items: { name: string; price: number }[];
     package_details?: {
@@ -260,4 +262,12 @@ export async function whatsappQuotation(
     throw new ApiError(result.detail || "Could not send on WhatsApp.", {}, response.status);
   }
   return result as { detail: string; message_id: string };
+}
+
+export function requestPasswordReset(email: string) {
+  return request<{ detail: string }>("/api/auth/password-reset/", { email });
+}
+
+export function confirmPasswordReset(uid: string, token: string, password: string) {
+  return request<{ detail: string }>("/api/auth/password-reset/confirm/", { uid, token, password });
 }

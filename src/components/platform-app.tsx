@@ -59,6 +59,7 @@ import {
   assistPayStatus,
   bookingPaid,
   formatDate,
+  formatDateRange,
   getPlatform,
   hydratePlatform,
   memberStats,
@@ -1047,7 +1048,7 @@ export function PlatformApp({ section = "dashboard" }: { section?: string }) {
                       <strong>{client(q.clientId)?.name}</strong>
                       <span className="mt-1 block text-xs text-muted-foreground">{q.event}</span>
                     </Td>
-                    <Td>{formatDate(q.date)}</Td>
+                    <Td>{formatDateRange(q.date, q.endDate)}</Td>
                     <Td className="font-semibold">{money(quoteTotal(q))}</Td>
                     <Td>
                       <Badge
@@ -2254,7 +2255,7 @@ export function QuoteForm({
     existingClient || { id: newId(), name: "", email: "", phone: "", city: "", notes: "" },
   );
   const [f, setF] = useState<Quote>(
-    existing || {
+    (existing && { ...existing, endDate: existing.endDate || existing.date }) || {
       id: newId(),
       number: `${data.settings.invoicePrefix || "FF"}-Q-${String(data.quotes.length + 1).padStart(4, "0")}`,
       enquiryId: "",
@@ -2262,6 +2263,7 @@ export function QuoteForm({
       packageId: "",
       event: "",
       date: "",
+      endDate: "",
       location: "",
       items: [],
       discount: 0,
@@ -2278,7 +2280,14 @@ export function QuoteForm({
 
   const calcInput = { packages: pkgs, discount: f.discount, advance: f.advance };
   const totals = calcTotals(calcInput);
-  const errors = validateQuote({ clientName: client.name, phone: client.phone, date: f.date, venue: f.location, ...calcInput });
+  const errors = validateQuote({
+    clientName: client.name,
+    phone: client.phone,
+    date: f.date,
+    endDate: f.endDate,
+    venue: f.location,
+    ...calcInput,
+  });
   const shown: QuoteValidation = submitted ? errors : {};
   const active = pkgs.find((p) => p.id === activeId) || pkgs[0];
 
@@ -2319,7 +2328,7 @@ export function QuoteForm({
     const keys = Object.keys(errors);
     if (keys.length) {
       const bad = keys.map((k) => k.split(":")[1]).find((id) => id && pkgs.some((p) => p.id === id));
-      if (bad && !["clientName", "phone", "date", "venue"].some((k) => k in errors)) setActiveId(bad);
+      if (bad && !["clientName", "phone", "date", "endDate", "venue"].some((k) => k in errors)) setActiveId(bad);
       toast.error(errors[keys[0]!]!);
       return;
     }
@@ -2359,7 +2368,7 @@ export function QuoteForm({
   return (
     <Modal title={existing ? `Edit ${existing.number}` : "New quotation"} onClose={onClose} xl>
       <form onSubmit={submit} noValidate className="space-y-3">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Input
             label="Client name *"
             value={client.name}
@@ -2374,11 +2383,24 @@ export function QuoteForm({
             onChange={(e) => setClient({ ...client, phone: e.target.value })}
           />
           <Input
-            label="Event date *"
+            label="Event start date *"
             type="date"
             value={f.date}
             error={shown.date}
-            onChange={(e) => setF({ ...f, date: e.target.value })}
+            onChange={(e) => {
+              const date = e.target.value;
+              // Keep the end date in step for single-day events and never let it fall before the start.
+              const endDate = !f.endDate || f.endDate === f.date || f.endDate < date ? date : f.endDate;
+              setF({ ...f, date, endDate });
+            }}
+          />
+          <Input
+            label="Event end date *"
+            type="date"
+            value={f.endDate || ""}
+            min={f.date || undefined}
+            error={shown.endDate}
+            onChange={(e) => setF({ ...f, endDate: e.target.value })}
           />
           <Input
             label="Venue *"
@@ -2570,7 +2592,7 @@ export async function buildDocument(
   pdf.text("PROJECT", 112, 90);
   pdf.setFont("helvetica", "normal");
   pdf.text(q.event, 112, 98);
-  pdf.text(formatDate(q.date), 112, 104);
+  pdf.text(formatDateRange(q.date, q.endDate), 112, 104);
   if (q.location) pdf.text(q.location, 112, 110);
   y = 126;
 
@@ -2707,6 +2729,7 @@ function QuotePreview({
         event: q.event,
         client_name: c?.name || "Client",
         date: q.date,
+        ...(q.endDate ? { end_date: q.endDate } : {}),
         location: q.location,
         items: q.items,
         ...(q.packageDetails ? { package_details: q.packageDetails } : {}),
@@ -2772,7 +2795,7 @@ function QuotePreview({
             <p className="text-xs uppercase tracking-wider text-muted-foreground">Event</p>
             <strong className="mt-1 block">{q.event}</strong>
             <span className="text-muted-foreground">
-              {formatDate(q.date)} · {q.location}
+              {formatDateRange(q.date, q.endDate)} · {q.location}
             </span>
           </div>
         </div>
@@ -2903,7 +2926,7 @@ function BookingForm({
   const [quoteId, setQuoteId] = useState(selectedQuote?.id || choices[0]?.id || "");
   const q = data.quotes.find((x) => x.id === quoteId);
   const [date, setDate] = useState(q?.date || "");
-  const [endDate, setEndDate] = useState(q?.date || "");
+  const [endDate, setEndDate] = useState(q?.endDate || q?.date || "");
   const [location, setLocation] = useState(q?.location || "");
   const [advance, setAdvance] = useState(q?.advance || 0);
   const [method, setMethod] = useState("UPI");
@@ -2913,7 +2936,7 @@ function BookingForm({
     const next = data.quotes.find((x) => x.id === id);
     setQuoteId(id);
     setDate(next?.date || "");
-    setEndDate(next?.date || "");
+    setEndDate(next?.endDate || next?.date || "");
     setLocation(next?.location || "");
     setAdvance(next?.advance || 0);
   };
